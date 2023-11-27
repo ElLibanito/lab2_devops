@@ -1,44 +1,44 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
-name: Node.js CI
-
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+name: Redis container example
+on: push
 
 jobs:
-  CI:
-
+  # Label of the container job
+  container-job:
+    # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: userapi # This is lab3 on root of the repository. 
+    # Docker Hub image that `container-job` executes in
+    container: node:10.18-jessie
 
-    strategy:
-      matrix:
-        node-version: [16.x] # Only one version to not use resources and go faster
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-        redis-version: [6]
-        
+    # Service containers to run with `container-job`
+    services:
+      # Label used to access the service container
+      redis:
+        # Docker Hub image
+        image: redis
+        # Set health checks to wait until redis has started
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-    - uses: actions/checkout@v3
+      # Downloads a copy of the code in your repository before running CI tests
+      - name: Check out repository code
+        uses: actions/checkout@v4
 
-    # Redis
-    - name: Start Redis
-      uses: supercharge/redis-github-action@1.4.0
-      with:
-        redis-version: ${{ matrix.redis-version }}
+      # Performs a clean installation of all dependencies in the `package.json` file
+      # For more information, see https://docs.npmjs.com/cli/ci.html
+      - name: Install dependencies
+        run: npm ci
 
-    # Nodejs
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-        cache-dependency-path: 'userapi/package-lock.json'
-    - run: npm ci # Similar to npm install but for CI. Doesn't rely on the package.json for dependency resolution; instead, it uses the package-lock.
-    - run: npm run build --if-present
-    - run: npm test
+      - name: Connect to Redis
+        # Runs a script that creates a Redis client, populates
+        # the client with data, and retrieves data
+        run: node client.js
+        # Environment variable used by the `client.js` script to create a new Redis client.
+        env:
+          # The hostname used to communicate with the Redis service container
+          REDIS_HOST: redis
+          # The default Redis port
+          REDIS_PORT: 6379
